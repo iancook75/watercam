@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        
+        <title>Watercam</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <script src = "/socket.io/socket.io.js" > </script>
+        <script type=text/javascript src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+        <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha256.js"></script>
+        <script>
+
+        $(document).on('change', '#new_user',function() {
+            console.log('toggle');
+            $('#code').toggle();
+            $('#pass_retype').toggle();
+        });
+
+        var UUID = '';
+        var socket = io.connect();
+        socket.on('capture_url', function (data) {
+        window.open("http://192.168.1.132:8090/" + data, "_self");
+        console.log(data);
+        });
+        socket.on('capture_address', function (data) {
+        document.getElementById("STREAM").src=data;
+        console.log(data);
+        });
+        socket.on('UUID', function (data) {
+            UUID = data;
+        });
+        function connect() {
+        socket.emit("new_con", '1');
+        }
+        window.onbeforeunload = function(){
+        socket.emit("disconnect", "1");
+        };
+        function down(){
+        socket.emit('down', '1');
+        }
+        function up(){
+        socket.emit('up', '1');
+        }
+        function left(){
+        socket.emit('left', '1');
+        }
+        function right(){
+        socket.emit('right', '1');
+        }
+        function take_pic(){
+        socket.emit('take_pic', '1');
+        }
+        function cap_address(){
+        socket.emit('cap_address', '1');
+        }
+        function hideLogin () {
+        $('#grey_out').toggle();
+        $('#login_box').toggle();
+        }
+        function auth() {
+
+
+            var username, passEnc, retypePassEnc, checked;
+
+            username = $('#username').val().toString();
+            passEnc = CryptoJS.SHA256($('#password').val());
+            retypePassEnc = CryptoJS.SHA256($('#retype_password').val());
+            oneTimeUseCode = $('#onu_code').val().toString();
+
+            if ( $('#new_user').attr('checked') ) {
+
+                checked = true;
+
+            }
+            else {
+                checked = false;
+            }
+
+            console.log(username + ' ' + passEnc);
+
+            if (checked == true) {
+                if ( $('#password').val() == $('#retype_password').val()) {
+                    socket.emit('auth', { user: username, password: passEnc.toString(), uuid: UUID, checked: checked, code: oneTimeUseCode });
+                }
+                else {
+
+                    $('#alertbox').toggle();
+                    $('#alertbox').text('Passwords Do Not Match');
+
+                }
+            }
+            else {
+
+                socket.emit('auth', { user: username, password: passEnc.toString(), uuid: UUID, checked: checked, code: oneTimeUseCode });
+
+            }
+                        
+        }
+        </script>
+    </head>
+    
+    <body>
+        <div id="application">
+            <div id="login_box">
+                <div class="form-container">
+                    <div class="form-title"><h2>Login</h2></div>
+                    <div id="alertbox" class="form-title"></div>
+                    <div class="form-title">Username</div>
+                    <input id="username" class="form-field" type="text" name="firstname" /><br />
+                    <div class="form-title">Password</div>
+                    <input id="password" class="form-field" type="password" name="retype_password" /><br />
+                    <div id="pass_retype">
+                        <div class="form-title">Re-Type Password</div>
+                        <input id="retype_password" class="form-field" type="password" name="retype_password" /><br />
+                    </div>
+                    <div class="form-title">New User<input type="checkbox" id="new_user" /></div><br />
+                    <div id="code">
+                        <div class="form-title">One Time Use Code</div>
+                        <input id="onu_code" class="form-field" type="text" name="otu_code" /><br />
+                    </div>
+                    <div class="submit-container">
+                        <input class="submit-button" type="button" value="Submit" onClick="auth()"/>
+                    </div>
+                </div>
+            </div>
+            <div id="grey_out"></div>
+            <div id="stream_disp">
+                <div id="arrow_keys">
+                    
+                    <div class="arrow"></div>
+                    <a onclick="up()" href="#" id="UP_ARROW"><img src="images/nav-arrows_02.png" class="arrow menu_hover"></a>
+                    <div class="arrow"></div>
+                    
+                    <a onclick="left()" href="#" id="LF_ARROW"><img src="images/nav-arrows_04.png" class="arrow menu_hover"></a>
+                    <a onclick="take_pic()" href="#"><img src="images/nav-arrows_05.png" id="CAMERA" class="arrow menu_hover"></a>
+                    <a onclick="right()" href="#" id="RT_ARROW"><img src="images/nav-arrows_06.png" class="arrow menu_hover"></a>
+                    
+                    <div class="arrow"></div>
+                    <a onclick="down()" href="#" id="DN_ARROW"><img src="images/nav-arrows_08.png" class="arrow menu_hover"></a>
+                    <div class="arrow"></div>
+                </div>
+                <script type=text/javascript>connect(); cap_address();</script>
+                <img src="images/placeholder.jpg" id="stream">
+            </div>
+        </div>
+    </body>
+</html>
