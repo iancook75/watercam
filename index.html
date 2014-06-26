@@ -15,6 +15,19 @@
             $('#pass_retype').toggle();
         });
 
+        function toggleAlert(state) {
+            if (state == true) {
+                if ($('#alertbox').css("display") == "none") {
+                    $('#alertbox').toggle();
+                }
+            }
+            else {
+                if ($('#alertbox').css("display") != "none") {
+                    $('#alertbox').toggle();
+                }
+            }
+        }
+
         var UUID = '';
         var socket = io.connect();
         socket.on('capture_url', function (data) {
@@ -27,6 +40,18 @@
         });
         socket.on('UUID', function (data) {
             UUID = data;
+        });
+        socket.on('bad_pass', function (data) {
+            toggleAlert(true);
+            $('#alertbox').text('Bad Username/Password!');
+        });
+        socket.on('bad_user', function (data) {
+            toggleAlert(true);
+            $('#alertbox').text('Username is already taken.');
+        });
+        socket.on('account_create', function (data) {
+            toggleAlert(true);
+            $('#alertbox').text('Account Created, Refresh Page and Login.');
         });
         function connect() {
         socket.emit("new_con", '1');
@@ -83,7 +108,7 @@
                 }
                 else {
 
-                    $('#alertbox').toggle();
+                    toggleAlert(true);
                     $('#alertbox').text('Passwords Do Not Match');
 
                 }

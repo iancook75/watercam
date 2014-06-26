@@ -22,6 +22,9 @@ var b = require('bonescript');
 //URL Requests
 var request = require('request');
 
+//bcrypt
+var bcrypt = require('bcrypt');
+
 //Setup Databases
 var Datastore = require('nedb');
 var db = {};
@@ -227,6 +230,7 @@ io.sockets.on('connection', function(socket) {
 
         var filePath = 'watercam/onetimekeys.txt'; // path to file
 
+        //If New User Creation Request
         if (data.checked) {
             fs.readFile(filePath, {
                 encoding: 'utf8'
@@ -236,14 +240,55 @@ io.sockets.on('connection', function(socket) {
                     console.log(filedata.indexOf(data.code));
 
                     if (filedata.indexOf(data.code) > -1) {
+
                         console.log('match!');
-                        //Create db.users entry for new user
-                        filedata = filedata.replace(data.code + '\r', '');
-                        filedata = filedata.substring(2);
-                        fs.writeFile(filePath, filedata, function(err) { // write file
-                            if (err) { // if error, report
-                                console.log(err);
+
+                        //Make Sure Username Isnt Taken
+                        db.users.find({ username: data.user }, function (err, currentdocs) {
+                            if (currentdocs.length == 0 ) {
+
+
+                                //Generate salt and encrypt password
+                                bcrypt.genSalt(10, function(err, salt) {
+                                    bcrypt.hash(data.password, salt, function(err, hash) {
+
+                                        //Create db.users entry for new user
+                                        var new_user = {
+
+                                            username: data.user,
+                                            password: hash,
+                                            isAdmin: false,
+
+                                        };
+
+                                        //Insert User Into Database
+                                        db.users.insert(new_user, function(err, newDoc) {});
+                                        //Verify User Inserted and Log to Console
+                                        db.users.find({ username: data.user }, function (err, docs) {
+
+                                            console.log(docs);
+                                        });
+
+
+                                    });
+                                });
+
+
+
+                                filedata = filedata.replace(data.code + '\r', '');
+
+                                fs.writeFile(filePath, filedata, function(err) { // write file
+                                    if (err) { // if error, report
+                                        console.log(err);
+                                    }
+                                });
+
                             }
+                            else {
+                                //Tell Client Bad Username
+                                socket.emit('bad_pass', '1');
+                            }
+
                         });
                         //Tell Client Account Created, Refresh and login
                     } else {

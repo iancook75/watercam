@@ -119,7 +119,7 @@
 			"file": "watercam.js",
 			"settings":
 			{
-				"buffer_size": 12495,
+				"buffer_size": 14098,
 				"line_ending": "Windows"
 			}
 		},
@@ -127,7 +127,7 @@
 			"file": "/C/Users/Ian Cook/Projects/auth db format.js",
 			"settings":
 			{
-				"buffer_size": 746,
+				"buffer_size": 754,
 				"line_ending": "Windows",
 				"name": "auth db format"
 			}
@@ -136,7 +136,7 @@
 			"file": "index.html",
 			"settings":
 			{
-				"buffer_size": 5620,
+				"buffer_size": 6473,
 				"line_ending": "Windows"
 			}
 		},
@@ -377,7 +377,7 @@
 	"groups":
 	[
 		{
-			"selected": 5,
+			"selected": 1,
 			"sheets":
 			[
 				{
@@ -385,15 +385,15 @@
 					"file": "watercam.js",
 					"settings":
 					{
-						"buffer_size": 12495,
+						"buffer_size": 14098,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								6999,
-								6999
+								8287,
+								8287
 							]
 						],
 						"settings":
@@ -556,7 +556,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 3924.0,
+						"translation.y": 4086.0,
 						"zoom_level": 1.0
 					},
 					"type": "text"
@@ -566,15 +566,15 @@
 					"file": "/C/Users/Ian Cook/Projects/auth db format.js",
 					"settings":
 					{
-						"buffer_size": 746,
+						"buffer_size": 754,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								746,
-								746
+								201,
+								201
 							]
 						],
 						"settings":
@@ -733,7 +733,9 @@
 							"codeintel_tooltips": "popup",
 							"color_scheme": "Packages/User/Color Highlighter/themes/Monokai Extended.tmTheme",
 							"sublime_auto_complete": true,
-							"syntax": "Packages/JavaScript/JavaScript.tmLanguage"
+							"syntax": "Packages/JavaScript/JavaScript.tmLanguage",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
 						"translation.y": 0.0,
@@ -746,15 +748,15 @@
 					"file": "index.html",
 					"settings":
 					{
-						"buffer_size": 5620,
+						"buffer_size": 6473,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								2637,
-								2637
+								3510,
+								3510
 							]
 						],
 						"settings":
@@ -917,7 +919,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 1026.0,
+						"translation.y": 1512.0,
 						"zoom_level": 1.0
 					},
 					"type": "text"
@@ -1476,8 +1478,8 @@
 						"selection":
 						[
 							[
-								762,
-								802
+								1015,
+								1057
 							]
 						],
 						"settings":
