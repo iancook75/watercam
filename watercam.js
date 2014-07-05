@@ -60,6 +60,17 @@ var mjpeg_streamer = {
         return mjpeg_streamer.outputPlugin + " -n -c " + mjpeg_streamer.outputPluginUser + ':' + mjpeg_streamer.outputPluginPass + ' -p ' + mjpeg_streamer.outputPluginPort;
     },
 
+    localURL: function() {
+        
+        return 'http://' + mjpeg_streamer.outputPluginUser + ':' + mjpeg_streamer.outputPluginPass + '@192.168.1.132:' + mjpeg_streamer.outputPluginPort + '/?action=stream';
+
+    },
+
+    remoteURL: function() {
+        
+        return 'http://' + mjpeg_streamer.outputPluginUser + ':' + mjpeg_streamer.outputPluginPass + '@muushu.duckdns.org:' + mjpeg_streamer.outputPluginPort + '/?action=stream';
+
+    },
 
 };
 
@@ -95,7 +106,7 @@ function handler(req, res) {
     //console.log(req.url);
     var action = requestParsed.pathname;
 
-    console.log(action);
+    //console.log(action);
 
     if (action == '/favicon.ico') {
 
@@ -114,6 +125,16 @@ function handler(req, res) {
             'Content-Type': 'text/css'
         });
         res.end(css, 'text');
+
+    }
+
+    if (action == '/index.js') {
+
+        var indexjs = fs.readFileSync('watercam/index.js');
+        res.writeHead(200, {
+            'Content-Type': 'text/javascript'
+        });
+        res.end(indexjs, 'text');
 
     }
 
@@ -180,25 +201,20 @@ io.sockets.on('connection', function(socket) {
 
     var address = socket.request.socket.remoteAddress;
     console.log("New connection from " + address);
+    var localClient = false;
 
-    socket.on('cap_address', function(data) {
+    if (address.substr(0, 7) == "192.168") {
 
+        console.log("Local Connection");
+        localClient = true; 
 
-        if (address.substr(0, 7) == "192.168") {
+    } else {
 
-            //socket.emit("capture_address", 'http://' + mjpeg_streamer.outputPluginUser + ':' + mjpeg_streamer.outputPluginPass + '@192.168.1.132:' + mjpeg_streamer.outputPluginPort + '/?action=stream');
+        console.log("Remote Connection");
+        localClient = false;
 
-            //socket.emit("capture_address", "http://192.168.1.132:8080/?action=stream");
-            console.log("Sending Local Link");
+    }
 
-        } else {
-
-            //socket.emit("capture_address", 'http://' + mjpeg_streamer.outputPluginUser + ':' + mjpeg_streamer.outputPluginPass + '@muushu.duckdns.org:' + mjpeg_streamer.outputPluginPort + '/?action=stream');
-            console.log("Sending Remote Link");
-
-        }
-
-    });
 
     socket.on('new_con', function(data) {
 
@@ -206,9 +222,6 @@ io.sockets.on('connection', function(socket) {
         console.log("connections: " + connectionCount);
         var new_user = {
             uuid: generateUUID(),
-            username: '',
-            password: '',
-            key: '',
             expiration: unixTime(),
             isAuth: false
         };
@@ -241,7 +254,7 @@ io.sockets.on('connection', function(socket) {
 
                     if (filedata.indexOf(data.code) > -1) {
 
-                        console.log('match!');
+                        console.log('OTU Code match!');
 
                         //Make Sure Username Isnt Taken
                         db.users.find({ username: data.user }, function (err, currentdocs) {
@@ -265,7 +278,7 @@ io.sockets.on('connection', function(socket) {
                                         db.users.insert(new_user, function(err, newDoc) {});
                                         //Verify User Inserted and Log to Console
                                         db.users.find({ username: data.user }, function (err, docs) {
-
+                                            socket.emit('account_create', 1);
                                             console.log(docs);
                                         });
 
@@ -300,7 +313,55 @@ io.sockets.on('connection', function(socket) {
                 }
             });
         }
-        db.users.find({});
+        else {
+
+            db.users.find({ username: data.user }, function(err, userdoc) {
+
+                console.log(userdoc);
+                var pass = userdoc.password;
+
+                if ( userdoc.length > 0 ) {
+
+                    console.log(userdoc);
+                    console.log('data.password: ' + data.password);
+                    if (bcrypt.compareSync(data.password, userdoc.password) == true ) {
+                        console.log('passwords match');
+                    }
+
+                    bcrypt.compare( data.password, userdoc.password, function(passerr, passres) {
+                        console.log('passres: ' + passres + ' errors: ' + passerr + ' pass: ' + userdoc.password);
+                        if (passres == true) {
+                            //Correct Pass
+                            console.log('User Logged In');
+                            db.auth.update({ UUID: data.uuid }, { $set: { isAuth: true } }, { multi: false }, function (err, numReplaced) {});
+                            db.auth.update({ UUID: data.uuid }, { $set: { expiration: unixTime() } }, { multi: false }, function (err, numReplaced) {});
+
+                            if (localClient == true) {
+                                socket.emit('logged_in', { url: mjpeg_streamer.localURL() });
+                            } else {
+                                socket.emit('logged_in', { url: mjpeg_streamer.remoteURL() });
+                            }
+
+                            
+                        }
+                        else {
+                            //Incorrect Pass
+                            socket.emit('bad_pass', 1);
+                            console.log('Bad Pass');
+                        }
+                    });
+
+                }
+                else {
+                    // User Not Found
+                    socket.emit('bad_pass', 1);
+                    console.log('Bad User');
+                }
+
+            });
+
+        }
+
     });
 
     socket.on('disconnect', function(data) {
@@ -507,6 +568,7 @@ function authUser(cred) {
 function unixTime() {
     var now = new Date();
     var time = now.getTime();
+    return time;
 }
 
 function generateTimestamp() {

@@ -30,6 +30,8 @@
 
 #alertbox {
   display: none;
+  color:#ff0000;
+  font-weight:bold;
 }
 #arrow_keys {
   width:240px;
