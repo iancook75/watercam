@@ -25,9 +25,9 @@ socket.on('capture_url', function(data) {
 });
 
 socket.on('logged_in', function(data) {
-    $('login_box').css("display") == "none";
-    $('grey_out').css("display") == "none";
-    document.getElementById("STREAM").src = data.url;
+    $('#login_box').toggle();
+    $('#grey_out').toggle();
+    document.getElementById("stream").src = data.url;
     console.log(data);
 });
 
@@ -60,31 +60,27 @@ function connect() {
 }
 
 window.onbeforeunload = function() {
-    socket.emit("disconnect", "1");
+    socket.emit("disconnect", UUID);
 };
 
 function down() {
-    socket.emit('down', '1');
+    socket.emit('down', UUID);
 }
 
 function up() {
-    socket.emit('up', '1');
+    socket.emit('up', UUID);
 }
 
 function left() {
-    socket.emit('left', '1');
+    socket.emit('left', UUID);
 }
 
 function right() {
-    socket.emit('right', '1');
+    socket.emit('right', UUID);
 }
 
 function take_pic() {
-    socket.emit('take_pic', '1');
-}
-
-function cap_address() {
-    socket.emit('cap_address', '1');
+    socket.emit('take_pic', UUID);
 }
 
 function hideLogin() {

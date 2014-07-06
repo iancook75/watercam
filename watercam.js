@@ -37,6 +37,7 @@ db.images = new Datastore({
     autoload: true
 });
 db.auth = new Datastore();
+
 //mjpeg_streamer child process vars
 var spawn = require('child_process').spawn;
 
@@ -90,22 +91,12 @@ app.listen(8090);
 
 //setInterval(function() { console.log(connectionCount);}, 10000);
 
-
-
 //URL Request Handlers
 function handler(req, res) {
-
-    //var ip = req.connection.remoteAddress;
-    //console.log(ip);
-    //if (ip.substr(0, 7) == "192.168") {
-    //console.log("local IP");
-    //}
-
 
     var requestParsed = url.parse(req.url, true);
     //console.log(req.url);
     var action = requestParsed.pathname;
-
     //console.log(action);
 
     if (action == '/favicon.ico') {
@@ -193,11 +184,10 @@ function handler(req, res) {
 
 }
 
-
 //Socket Request Handlers
-
-
 io.sockets.on('connection', function(socket) {
+
+    var socketUUID = '';
 
     var address = socket.request.socket.remoteAddress;
     console.log("New connection from " + address);
@@ -215,7 +205,6 @@ io.sockets.on('connection', function(socket) {
 
     }
 
-
     socket.on('new_con', function(data) {
 
         connectionCount++;
@@ -225,6 +214,7 @@ io.sockets.on('connection', function(socket) {
             expiration: unixTime(),
             isAuth: false
         };
+        socketUUID = new_user.uuid;
         db.auth.insert(new_user, function(err, newDoc) {});
         db.auth.find({
             uuid: new_user.uuid
@@ -238,6 +228,7 @@ io.sockets.on('connection', function(socket) {
         }
 
     });
+
     socket.on('auth', function(data) {
         console.log('auth data: ' + data.user + ' ' + data.password + ' ' + data.uuid + ' ' + data.checked + ' ' + data.code);
 
@@ -260,7 +251,6 @@ io.sockets.on('connection', function(socket) {
                         db.users.find({ username: data.user }, function (err, currentdocs) {
                             if (currentdocs.length == 0 ) {
 
-
                                 //Generate salt and encrypt password
                                 bcrypt.genSalt(10, function(err, salt) {
                                     bcrypt.hash(data.password, salt, function(err, hash) {
@@ -282,11 +272,8 @@ io.sockets.on('connection', function(socket) {
                                             console.log(docs);
                                         });
 
-
                                     });
                                 });
-
-
 
                                 filedata = filedata.replace(data.code + '\r', '');
 
@@ -306,6 +293,7 @@ io.sockets.on('connection', function(socket) {
                         //Tell Client Account Created, Refresh and login
                     } else {
                         //Tell Client Bad OTU Key
+                        socket.emit('bad_otu', 1);
                     }
 
                 } else {
@@ -317,24 +305,27 @@ io.sockets.on('connection', function(socket) {
 
             db.users.find({ username: data.user }, function(err, userdoc) {
 
-                console.log(userdoc);
+                //console.log(userdoc);
                 var pass = userdoc.password;
 
                 if ( userdoc.length > 0 ) {
 
                     console.log(userdoc);
-                    console.log('data.password: ' + data.password);
-                    if (bcrypt.compareSync(data.password, userdoc.password) == true ) {
-                        console.log('passwords match');
-                    }
+                    //console.log('data.password: ' + data.password);
 
-                    bcrypt.compare( data.password, userdoc.password, function(passerr, passres) {
-                        console.log('passres: ' + passres + ' errors: ' + passerr + ' pass: ' + userdoc.password);
+                    bcrypt.compare( data.password, userdoc[0].password, function(passerr, passres) {
+                        //console.log('passres: ' + passres + ' errors: ' + passerr + ' pass: ' + userdoc.password);
                         if (passres == true) {
                             //Correct Pass
                             console.log('User Logged In');
-                            db.auth.update({ UUID: data.uuid }, { $set: { isAuth: true } }, { multi: false }, function (err, numReplaced) {});
-                            db.auth.update({ UUID: data.uuid }, { $set: { expiration: unixTime() } }, { multi: false }, function (err, numReplaced) {});
+                            db.auth.update({ uuid: data.uuid }, { $set: { isAuth: true } }, { multi: false }, function (err, numReplaced) {
+                                console.log(err + ' ' + numReplaced);
+                            });
+                            db.auth.update({ uuid: data.uuid }, { $set: { expiration: unixTime() } }, { multi: false }, function (err, numReplaced) {
+                                console.log(err + ' ' + numReplaced);
+                            });
+
+                            startMjpeg();
 
                             if (localClient == true) {
                                 socket.emit('logged_in', { url: mjpeg_streamer.localURL() });
@@ -342,7 +333,6 @@ io.sockets.on('connection', function(socket) {
                                 socket.emit('logged_in', { url: mjpeg_streamer.remoteURL() });
                             }
 
-                            
                         }
                         else {
                             //Incorrect Pass
@@ -364,7 +354,12 @@ io.sockets.on('connection', function(socket) {
 
     });
 
-    socket.on('disconnect', function(data) {
+    socket.on('disconnect', function(logoutdata) {
+        console.log('logout data: ' + logoutdata);
+
+        db.auth.remove({ uuid: socketUUID }, {}, function(err, numRemoved) {
+            console.log('UUID: ' + socketUUID + ' logged out' );
+        });
 
         if (connectionCount > 0) {
             connectionCount--;
@@ -373,38 +368,127 @@ io.sockets.on('connection', function(socket) {
 
         if (connectionCount == 0) {
             stopMjpeg();
-            console.log('Stopped mjpeg-server');
+            //console.log('Stopped mjpeg-server');
         }
 
     });
 
     socket.on('down', function(data) {
+        db.auth.findOne({ uuid: data }, function (err, authdoc) {
+            //console.log('authdoc: ' + authdoc);
+            if (authdoc != null) {
+                if (authdoc.isAuth == true) {
+                    if ((authdoc.expiration + 600) < unixTime()) {
 
-        SERVO_POS = SERVO_POS - (data / 100);
-        b.analogWrite(SERVO, SERVO_POS, 60, null);
-        //console.log("Servo 1 POS: " + SERVO_POS);
+                        moveCam("down");
+                        updateExpiration(data);
+                        //console.log("Servo 1 POS: " + SERVO_POS);
+                        
+                    }
+                    else {
+                        console.log('Auth Expired');
+                    }
+
+                }
+                else {
+                    console.log('Not Authed');
+                }
+            }
+            else {
+                console.log('No Auth Data');
+            }
+
+        });
 
     });
 
     socket.on('up', function(data) {
+        db.auth.findOne({ uuid: data }, function (err, authdoc) {
+            //console.log('authdoc: ' + authdoc);
+            if (authdoc != null) {
+                if (authdoc.isAuth == true) {
+                    if ((authdoc.expiration + 600) < unixTime()) {
 
-        SERVO_POS = SERVO_POS + (data / 100);
-        b.analogWrite(SERVO, SERVO_POS, 60, null);
-        //console.log("Servo 1 POS: " + SERVO2_POS);
+                        moveCam("up");
+                        updateExpiration(data);
+                        //console.log("Servo 1 POS: " + SERVO_POS);
+                        
+                    }
+                    else {
+                        console.log('Auth Expired');
+                    }
+
+                }
+                else {
+                    console.log('Not Authed');
+                }
+            }
+            else {
+                console.log('No Auth Data');
+            }
+
+        });
+
 
     });
 
     socket.on('left', function(data) {
+        db.auth.findOne({ uuid: data }, function (err, authdoc) {
+            //console.log('authdoc: ' + authdoc);
+            if (authdoc != null) {
+                if (authdoc.isAuth == true) {
+                    if ((authdoc.expiration + 600) < unixTime()) {
 
-        SERVO2_POS = SERVO2_POS + (data / 100);
-        b.analogWrite(SERVO2, SERVO2_POS, 60, null);
+                        moveCam("left");
+                        updateExpiration(data);
+                        //console.log("Servo 1 POS: " + SERVO_POS);
+                        
+                    }
+                    else {
+                        console.log('Auth Expired');
+                    }
+
+                }
+                else {
+                    console.log('Not Authed');
+                }
+            }
+            else {
+                console.log('No Auth Data');
+            }
+
+        });
+
 
     });
 
     socket.on('right', function(data) {
 
-        SERVO2_POS = SERVO2_POS - (data / 100);
-        b.analogWrite(SERVO2, SERVO2_POS, 60, null);
+        db.auth.findOne({ uuid: data }, function (err, authdoc) {
+            //console.log('authdoc: ' + authdoc);
+            if (authdoc != null) {
+                if (authdoc.isAuth == true) {
+                    if ((authdoc.expiration + 600) < unixTime()) {
+
+                        moveCam("right");
+                        updateExpiration(data);
+                        //console.log("Servo 1 POS: " + SERVO_POS);
+                        
+                    }
+                    else {
+                        console.log('Auth Expired');
+                    }
+
+                }
+                else {
+                    console.log('Not Authed');
+                }
+            }
+            else {
+                console.log('No Auth Data');
+            }
+
+        });
 
     });
 
@@ -446,8 +530,15 @@ var download = function(uri, filename, callback) {
         res.pipe(file);
     });
 
-
 };
+
+function updateExpiration(idToUpdate) {
+
+    db.auth.update({ uuid: idToUpdate }, { $set: { expiration: unixTime() } }, { multi: false }, function (err, numReplaced) {
+        console.log('Expiration Update: ' + err + ' ' + numReplaced);
+    });
+
+}
 
 function startMjpeg() {
 
@@ -455,10 +546,8 @@ function startMjpeg() {
 
     if (mjpeg_streamer.server_started == false) {
 
-        //mjpeg_streamer.proc = spawn( mjpeg_streamer.bin, [ mjpeg_streamer.user, mjpeg_streamer.pass, mjpeg_streamer.port]);
-
-        mjpeg_streamer.outputPluginUser = genRand();
-        mjpeg_streamer.outputPluginPass = genRand();
+        mjpeg_streamer.outputPluginUser = genRand(10);
+        mjpeg_streamer.outputPluginPass = genRand(10);
 
         mjpeg_streamer.proc = spawn(mjpeg_streamer.bin, ['-i', mjpeg_streamer.inputPluginString(), '-o', mjpeg_streamer.outputPluginString()]);
         mjpeg_streamer.server_started = true;
@@ -479,12 +568,12 @@ function startMjpeg() {
 
             console.log('mjpg-streamer child process exited with code ' + code);
             mjpeg_streamer.server_started = false;
+
         });
 
         mjpeg_streamer.proc.on('error', function(err) {
 
             console.log('mjpg-streamer error', err);
-
 
         });
 
@@ -497,12 +586,14 @@ function startMjpeg() {
 }
 
 function stopMjpeg() {
+
     if (mjpeg_streamer.server_started == true) {
         mjpeg_streamer.server_started = false;
         mjpeg_streamer.proc.kill('SIGHUP');
     } else {
         console.log('mjpeg-server already stopped');
     }
+
 }
 
 function genRand(len) {
@@ -540,30 +631,29 @@ function db_ins_img(timestamp) {
         };
 
         db.images.insert(img_doc, function(err, newDoc) {});
-        db.images.find({
-            index: count + 1
-        }, function(err, docs) {
+        db.images.find({ index: count + 1 }, function(err, docs) {
             console.log(docs);
         });
 
     });
+
 }
 
 function generateUUID() {
+
     var d = new Date().getTime();
     var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
         function(c) {
+
             var r = (d + Math.random() * 16) % 16 | 0;
             d = Math.floor(d / 16);
             return (c == 'x' ? r : (r & 0x7 | 0x8)).toString(16);
+
         });
+
     return uuid;
+
 };
-
-function authUser(cred) {
-
-
-}
 
 function unixTime() {
     var now = new Date();
@@ -572,7 +662,46 @@ function unixTime() {
 }
 
 function generateTimestamp() {
+
     var now = new Date();
     var timestamp = now.getMonth() + "-" + now.getDate() + "-" + now.getFullYear() + "." + now.getHours() + "." + now.getMinutes() + "." + now.getSeconds();
+
     return timestamp;
+
+}
+
+function moveCam(direction) {
+
+    console.log( 'servo 1 pos: ' + SERVO_POS + ' servo 2 pos: ' + SERVO2_POS);
+
+    if (direction == "up") {
+
+        SERVO_POS = SERVO_POS + .01;
+        b.analogWrite(SERVO, SERVO_POS, 60, null);
+        //console.log("Servo 1 POS: " + SERVO2_POS);
+        //
+    }
+
+    if (direction == "down") {
+
+        SERVO_POS = SERVO_POS - .01;
+        b.analogWrite(SERVO, SERVO_POS, 60, null);
+
+    }
+
+    if (direction == "left") {
+
+        SERVO2_POS = SERVO2_POS + .01;
+        b.analogWrite(SERVO2, SERVO2_POS, 60, null);
+
+
+    }
+
+    if (direction == "right") {
+
+        SERVO2_POS = SERVO2_POS - .01;
+        b.analogWrite(SERVO2, SERVO2_POS, 60, null);
+
+    }
+
 }
